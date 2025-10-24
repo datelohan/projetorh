@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RH
+  GESTOR
+  FUNCIONARIO
+}
+
+enum StatusProcessoContratacao {
+  RASCUNHO
+  EM_ANDAMENTO
+  OFERTA_ENVIADA
+  CONCLUIDO
+  CANCELADO
+}
+
+enum StatusEtapaContratacao {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+enum StatusFerias {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  CANCELADO
+}
+
+enum CategoriaDespesa {
+  TRANSPORTE
+  HOSPEDAGEM
+  ALIMENTACAO
+  COMUNICACAO
+  OUTROS
+}
+
+enum StatusDespesa {
+  PENDENTE
+  APROVADA
+  REJEITADA
+  REEMBOLSADA
+}
+
+enum TipoRegistroPonto {
+  ENTRADA
+  SAIDA
+  PAUSA
+  RETORNO
+}
+
+model Usuario {
+  id             String    @id @default(uuid())
+  nome           String
+  email          String    @unique
+  senhaHash      String
+  role           Role
+  ativo          Boolean   @default(true)
+  funcionario    Funcionario?
+  processos      ProcessoContratacao[] @relation("ResponsavelProcesso")
+  feriasAprovadas Ferias[] @relation("AprovadorFerias")
+  despesasAprovadas DespesaViagem[] @relation("AprovadorDespesa")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Funcionario {
+  id               String    @id @default(uuid())
+  usuarioId        String?   @unique
+  usuario          Usuario?  @relation(fields: [usuarioId], references: [id])
+  nomeCompleto     String
+  cpf              String    @unique
+  dataNascimento   DateTime?
+  cargo            String
+  departamento     String?
+  gestorId         String?
+  gestor           Funcionario? @relation("FuncionarioGestor", fields: [gestorId], references: [id])
+  equipe           Funcionario[] @relation("FuncionarioGestor")
+  dataAdmissao     DateTime
+  dataDemissao     DateTime?
+  salarioBase      Decimal?   @db.Decimal(10, 2)
+  processos        ProcessoContratacao[] @relation("ProcessoFuncionario")
+  ferias           Ferias[]
+  despesas         DespesaViagem[]
+  registrosPonto   RegistroPonto[]
+  holerites        Holerite[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model ProcessoContratacao {
+  id               String                      @id @default(uuid())
+  cargo            String
+  candidatoNome    String
+  candidatoEmail   String?
+  status           StatusProcessoContratacao   @default(EM_ANDAMENTO)
+  observacoes      String?
+  funcionarioId    String?
+  funcionario      Funcionario?                @relation("ProcessoFuncionario", fields: [funcionarioId], references: [id])
+  responsavelId    String?
+  responsavel      Usuario?                    @relation("ResponsavelProcesso", fields: [responsavelId], references: [id])
+  etapas           ProcessoContratacaoEtapa[]
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+}
+
+model ProcessoContratacaoEtapa {
+  id             String                     @id @default(uuid())
+  processoId     String
+  ordem          Int
+  titulo         String
+  descricao      String?
+  status         StatusEtapaContratacao     @default(PENDENTE)
+  agendadoPara   DateTime?
+  concluidoEm    DateTime?
+  processo       ProcessoContratacao        @relation(fields: [processoId], references: [id])
+  createdAt      DateTime                   @default(now())
+
+  @@unique([processoId, ordem])
+}
+
+model Ferias {
+  id            String        @id @default(uuid())
+  funcionarioId String
+  inicio        DateTime
+  fim           DateTime
+  dias          Int
+  status        StatusFerias  @default(PENDENTE)
+  observacoes   String?
+  aprovadorId   String?
+  aprovador     Usuario?      @relation("AprovadorFerias", fields: [aprovadorId], references: [id])
+  funcionario   Funcionario   @relation(fields: [funcionarioId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model DespesaViagem {
+  id             String         @id @default(uuid())
+  funcionarioId  String
+  categoria      CategoriaDespesa
+  descricao      String
+  valor          Decimal        @db.Decimal(10, 2)
+  dataDespesa    DateTime
+  status         StatusDespesa  @default(PENDENTE)
+  observacoes    String?
+  aprovadorId    String?
+  aprovador      Usuario?       @relation("AprovadorDespesa", fields: [aprovadorId], references: [id])
+  reciboUrl      String?
+  funcionario    Funcionario    @relation(fields: [funcionarioId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model RegistroPonto {
+  id             String            @id @default(uuid())
+  funcionarioId  String
+  tipo           TipoRegistroPonto
+  registradoEm   DateTime          @default(now())
+  observacao     String?
+  funcionario    Funcionario       @relation(fields: [funcionarioId], references: [id])
+  createdAt      DateTime          @default(now())
+
+  @@index([funcionarioId, registradoEm])
+}
+
+model Holerite {
+  id             String    @id @default(uuid())
+  funcionarioId  String
+  competencia    String
+  referencia     DateTime?
+  valorBruto     Decimal   @db.Decimal(10, 2)
+  valorLiquido   Decimal   @db.Decimal(10, 2)
+  arquivoUrl     String?
+  observacoes    String?
+  funcionario    Funcionario @relation(fields: [funcionarioId], references: [id])
+  createdAt      DateTime   @default(now())
+
+  @@unique([funcionarioId, competencia])
+}
