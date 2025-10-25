@@ -8,17 +8,20 @@ import {
   StatusProcessoContratacao,
   TipoRegistroPonto,
 } from '@prisma/client';
+import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const saltRounds = 10;
+
   const admin = await prisma.usuario.upsert({
     where: { email: 'admin@projetorh.com' },
     update: {},
     create: {
       nome: 'Admin RH',
       email: 'admin@projetorh.com',
-      senhaHash: 'senha_admin_hash',
+      senhaHash: await hash('admin123', saltRounds),
       role: Role.ADMIN,
     },
   });
@@ -29,7 +32,7 @@ async function main() {
     create: {
       nome: 'Gestor Equipe',
       email: 'gestor@projetorh.com',
-      senhaHash: 'senha_gestor_hash',
+      senhaHash: await hash('gestor123', saltRounds),
       role: Role.GESTOR,
     },
   });
@@ -48,7 +51,7 @@ async function main() {
         create: {
           nome: 'Maria Souza',
           email: 'maria@projetorh.com',
-          senhaHash: 'senha_maria_hash',
+          senhaHash: await hash('maria123', saltRounds),
           role: Role.RH,
         },
       },

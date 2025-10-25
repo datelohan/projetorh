@@ -1,8 +1,12 @@
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { ensureAuthenticated } from '../middlewares/ensureAuthenticated';
+import { hashPassword } from '../utils/password';
 
 export const funcionariosRouter = Router();
+
+funcionariosRouter.use(ensureAuthenticated);
 
 funcionariosRouter.get('/', async (_req, res, next) => {
   try {
@@ -14,6 +18,7 @@ funcionariosRouter.get('/', async (_req, res, next) => {
             nome: true,
             email: true,
             role: true,
+            ativo: true,
           },
         },
         gestor: {
@@ -46,8 +51,27 @@ funcionariosRouter.post('/', async (req, res, next) => {
 
     if (!nomeCompleto || !cpf || !cargo || !dataAdmissao) {
       return res.status(400).json({
-        message: 'Campos obrigatórios: nomeCompleto, cpf, cargo, dataAdmissao.',
+        message: 'Campos obrigatorios: nomeCompleto, cpf, cargo, dataAdmissao.',
       });
+    }
+
+    let usuarioNovo;
+    if (usuario) {
+      if (!usuario.nome || !usuario.email || !usuario.senha || !usuario.role) {
+        return res.status(400).json({
+          message: 'Para criar o usuario vinculado informe nome, email, senha e role.',
+        });
+      }
+
+      usuarioNovo = {
+        create: {
+          nome: usuario.nome,
+          email: usuario.email,
+          senhaHash: await hashPassword(usuario.senha),
+          role: usuario.role,
+          ativo: usuario.ativo ?? true,
+        },
+      };
     }
 
     const funcionario = await prisma.funcionario.create({
@@ -59,17 +83,7 @@ funcionariosRouter.post('/', async (req, res, next) => {
         dataAdmissao: new Date(dataAdmissao),
         gestor: gestorId ? { connect: { id: gestorId } } : undefined,
         salarioBase,
-        usuario: usuario
-          ? {
-              create: {
-                nome: usuario.nome,
-                email: usuario.email,
-                senhaHash: usuario.senha,
-                role: usuario.role,
-                ativo: usuario.ativo ?? true,
-              },
-            }
-          : undefined,
+        usuario: usuarioNovo,
       },
       include: {
         usuario: true,
@@ -81,7 +95,7 @@ funcionariosRouter.post('/', async (req, res, next) => {
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return res.status(409).json({
-        message: 'CPF ou email já cadastrado.',
+        message: 'CPF ou email ja cadastrado.',
       });
     }
     next(error);
